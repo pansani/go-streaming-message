@@ -3,16 +3,87 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Our Streamed Tokens App</title>
+    <title>Streaming Tokens App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+            background-color: #f4f4f4;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        #response-section {
+            width: 60%;
+            min-height: 100px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ccc;
+            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            font-size: 18px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        form {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input {
+            padding: 10px;
+            font-size: 16px;
+            width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
-    <div id="response-section"></div>    
-    <form method="POST">
-        <button type="button" onclick="start()">Start</button>
+
+    <header>
+        <h1>Real-Time AI Text Streaming</h1>
+        <p class="subtitle">Powered by Generative AI</p>
+    </header>
+
+    <form>
+        <input type="text" id="message-input" placeholder="Enter your message..." required>
+        <button type="button" onclick="start()">Start Streaming</button>
     </form>
+
+    <div id="example-section">
+        <div class="example-content">
+            <h2>Example Prompts</h2>
+            <p class="example-prompt">"An increasing sequence: one,"</p>
+            <p class="example-prompt">"First 10 letters of the alphabet are: a,"</p>
+        </div>
+    </div>
+
+    <div id="response-section">Waiting for streamed response...</div>
+
 </body>
 <script>
-
 document.querySelector("form").addEventListener("submit", function (e) {
     e.preventDefault();
 });
@@ -20,21 +91,40 @@ document.querySelector("form").addEventListener("submit", function (e) {
 let evtSource = null;
 
 async function start() {
-    try {
-        await fetch("/start", { method: "POST" });
+    const message = document.getElementById("message-input").value.trim();
+    
+    if (!message) {
+        alert("Please enter a message before starting.");
+        return;
+    }
 
-        evtSource = new EventSource("/generate");
+    try {
+        const response = await fetch("/start", { 
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: message })  
+        });
+
+        if (!response.ok) {
+            console.error("Server Error:", response.statusText);
+            alert("Error: " + response.statusText);
+            return;
+        }
+
+        const text = await response.text();
+        if (!text) {
+            console.warn("Received empty response from /start");
+        } else {
+            const responseData = JSON.parse(text);
+            console.log("Start response:", responseData);
+        }
+
+        evtSource = new EventSource(`/generate?message=${encodeURIComponent(message)}`);
+        document.getElementById("response-section").innerHTML = "";
 
         evtSource.addEventListener("streamed-text", (event) => {
             console.log("Received streamed text:", event.data);
-
-            const div = document.getElementById("response-section");
-            div.innerHTML += event.data + " "; 
-
-            if (event.data.trim() === "[STREAM DONE]") {
-                console.log("Stream completed. Closing SSE.");
-                evtSource.close(); 
-            }
+            document.getElementById("response-section").innerHTML += event.data + " "; 
         });
 
         evtSource.onerror = (err) => {
@@ -46,6 +136,7 @@ async function start() {
         console.error("Error when starting process:", error);
     }
 }
+
 
 </script>
 </html>

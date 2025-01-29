@@ -2,11 +2,13 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -27,8 +29,12 @@ func init() {
 // generateText calls FastAPI and returns every token received on the fly through
 // a dedicated channel (streamedTextCh).
 // If the EOF character is received from FastAPI, it means that text generation is over.
-func generateText(streamedTextCh chan<- string) {
-	req, err := http.NewRequest("GET", "http://127.0.0.1:8000", nil)
+func generateText(streamedTextCh chan<- string, message string) {
+	escapedMessage := url.QueryEscape(message)
+	url := fmt.Sprintf("http://127.0.0.1:8000/generate?message=%s", escapedMessage)
+	log.Println("Sending request to FastAPI:", url)
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Fatal("Error creating request:", err)
 	}
@@ -91,8 +97,14 @@ func generate(w http.ResponseWriter, r *http.Request) {
 
 	streamedTextCh := make(chan string)
 
-	// Start background text generation
-	go generateText(streamedTextCh)
+	message := r.URL.Query().Get("message")
+	if message == "" {
+		log.Println("No message provided")
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
+
+	go generateText(streamedTextCh, message)
 
 	// Set headers for SSE
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -116,7 +128,35 @@ func generate(w http.ResponseWriter, r *http.Request) {
 
 // start starts an asynchronous request to the AI engine.
 func start(w http.ResponseWriter, r *http.Request) {
-	go generateText(streamedTextCh)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Println("Error reading request body:", err)
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+
+	log.Println("Raw request body:", string(body))
+
+	var requestData map[string]string
+	err = json.Unmarshal(body, &requestData)
+	if err != nil {
+		log.Println("Error parsing JSON:", err)
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	message, exists := requestData["message"]
+	if !exists || message == "" {
+		log.Println("No message provided in JSON")
+		http.Error(w, "Message is required", http.StatusBadRequest)
+		return
+	}
+
+	log.Println("Received message:", message)
+
+	streamedTextCh := make(chan string)
+
+	go generateText(streamedTextCh, message)
 }
 
 func home(w http.ResponseWriter, r *http.Request) {
