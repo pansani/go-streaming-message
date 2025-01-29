@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Our Streamed Tokens App</title>
+</head>
+<body>
+    <div id="response-section"></div>    
+    <form method="POST">
+        <button onclick="start()">Start</button>
+    </form>
+</body>
+<script>
+    // Disable the default behavior of the HTML form.
+    document.querySelector('form').addEventListener('submit', function(e) {
+        e.preventDefault()
+    })
+
+    // Make a request to the /start to trigger the request to the AI model.
+    async function start() {
+        try {
+            const response = await fetch("/start", {
+            method: "POST",
+            })
+        } catch (error) {
+            console.error("Error when starting process:", error)
+        }
+    }
+
+    // Listen to SSE by subscribing to the /generate page, and
+    // put the result in the #response-section div.
+ 
+
+
+const evtSource = new EventSource("/generate");
+
+evtSource.addEventListener("streamed-text", (event) => {
+    console.log("Received streamed text:", event.data);
+
+    const div = document.getElementById("response-section");
+    div.innerHTML += event.data + " "; // Append tokens
+
+    // 🚀 **If "[STREAM DONE]" is received, close the SSE connection**
+    if (event.data.trim() === "[STREAM DONE]") {
+        console.log("Stream completed. Closing SSE.");
+        evtSource.close(); // Stops reconnecting
+    }
+});
+
+evtSource.onerror = (err) => {
+    console.error("SSE error:", err);
+    evtSource.close(); // Prevents infinite reconnect loops
+};
+
+
+</script>
+</html>
