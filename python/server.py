@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from threading import Thread
-import torch
 
 model = AutoModelForCausalLM.from_pretrained("gpt2")
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
@@ -25,10 +24,9 @@ async def generate():
     thread = Thread(target=model.generate, kwargs=generation_kwargs)
     thread.start()
 
-    # Stream tokens with a delay
     for new_text in streamer:
-        await asyncio.sleep(0.2)  # Add a delay to simulate streaming
-        yield new_text + "\n"  # Ensure each token is newline-separated
+        await asyncio.sleep(0.2)
+        yield new_text + "\n"
 
 
 @app.get("/")

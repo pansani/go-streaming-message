@@ -102,14 +102,14 @@ func generate(w http.ResponseWriter, r *http.Request) {
 	for text := range streamedTextCh {
 		event := fmt.Sprintf("event: streamed-text\ndata: %s\n\n", text)
 
-		log.Println("Sending SSE to client:", event) // Debug log
+		log.Println("Sending SSE to client:", event)
 		_, err := fmt.Fprint(w, event)
 		if err != nil {
 			log.Println("Error sending SSE to client:", err)
 			break
 		}
 
-		flusher.Flush() // 🚀 Push each token to the client immediately
+		flusher.Flush()
 	}
 	log.Println("Stream ended for client")
 }
